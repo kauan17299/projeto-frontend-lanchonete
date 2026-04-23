@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Autoatendimento - Lanchonete Expansão</title>
+    <style>
+        /* CSS - ESTILIZAÇÃO E RESPONSIVIDADE (MOBILE-FIRST) */
+        :root {
+            --primaria: #e63946;
+            --secundaria: #1d3557;
+            --fundo: #f8f9fa;
+            --texto: #2b2d42;
+            --sucesso: #2a9d8f;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--fundo);
+            color: var(--texto);
+            margin: 0;
+            padding: 0;
+        }
+
+        header {
+            background-color: var(--primaria);
+            color: white;
+            padding: 1rem;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .container {
+            max-width: 600px;
+            margin: auto;
+            padding: 20px;
+        }
+
+        /* Cardápio e Itens */
+        .secao { margin-bottom: 25px; }
+        
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .info-produto h4 { margin: 0; color: var(--secundaria); }
+
+        /* Botões */
+        button {
+            background-color: var(--secundaria);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        button:active { transform: scale(0.95); }
+        .btn-add { background-color: var(--primaria); }
+
+        /* Carrinho e Checkout */
+        #carrinho-container {
+            border-top: 2px solid #ddd;
+            padding-top: 20px;
+        }
+
+        .badge-fidelidade {
+            background: #ffb703;
+            color: #000;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            display: inline-block;
+            margin-bottom: 10px;
+        }
+
+        /* LGPD Banner */
+        #lgpd-banner {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            background: #fff;
+            border: 2px solid var(--secundaria);
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            z-index: 1000;
+            display: none;
+        }
+
+        /* Feedback de Pagamento */
+        #tela-processamento {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.95);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            z-index: 2000;
+        }
+
+        .loader {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid var(--primaria);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<header>
+    <h2>Lanchonete Expansão</h2>
+</header>
+
+<div class="container">
+    <div class="secao">
+        <label><b>Selecione a Unidade:</b></label>
+        <select id="unidade" class="card" style="width: 100%; margin-top: 10px;">
+            <option value="1">Unidade Centro - São Paulo</option>
+            <option value="2">Unidade Shopping - Rio de Janeiro</option>
+            <option value="3">Unidade Drive-Thru - Curitiba</option>
+        </select>
+    </div>
+
+    <div class="secao">
+        <h3>Cardápio</h3>
+        <div id="cardapio">
+            </div>
+    </div>
+
+    <div id="carrinho-container" class="secao">
+        <h3>Seu Pedido</h3>
+        <div id="itens-carrinho">O carrinho está vazio.</div>
+        <hr>
+        <div class="badge-fidelidade">✨ Você ganhará <span id="pontos-ganhos">0</span> pontos com esta compra!</div>
+        <p style="font-size: 1.2rem;"><b>Total: R$ <span id="valor-total">0,00</span></b></p>
+        <button style="width: 100%; font-size: 1.1rem;" onclick="abrirPagamento()">FINALIZAR PAGAMENTO</button>
+    </div>
+</div>
+
+<div id="lgpd-banner">
+    <p><b>Privacidade:</b> Utilizamos dados apenas para processar seu pedido e gerenciar seus pontos de fidelidade conforme a <b>LGPD</b>. Aceita nossos termos?</p>
+    <button onclick="aceitarPrivacidade()" style="background-color: var(--sucesso);">CONCORDO E CONTINUAR</button>
+</div>
+
+<div id="tela-processamento">
+    <div class="loader"></div>
+    <h3 id="msg-pagamento">Comunicando com o serviço de pagamento...</h3>
+    <p id="sub-msg">Aguarde a resposta da operadora.</p>
+    <button id="btn-fechar-sucesso" style="display:none; background-color: var(--sucesso);" onclick="reiniciarSistema()">NOVO PEDIDO</button>
+</div>
+
+<script>
+    // DADOS MOCKADOS (SIMULAÇÃO DE BACK-END)
+    const produtos = [
+        { id: 1, nome: "X-Burger Artesanal", preco: 34.90 },
+        { id: 2, nome: "Batata Frita Média", preco: 18.00 },
+        { id: 3, nome: "Refrigerante 500ml", preco: 9.50 },
+        { id: 4, nome: "Combo Família", preco: 115.00 }
+    ];
+
+    let carrinho = [];
+    let total = 0;
+
+    // INICIALIZAÇÃO
+    window.onload = () => {
+        renderizarCardapio();
+        verificarLGPD();
+    };
+
+    function renderizarCardapio() {
+        const divCardapio = document.getElementById('cardapio');
+        divCardapio.innerHTML = produtos.map(p => `
+            <div class="card">
+                <div class="info-produto">
+                    <h4>${p.nome}</h4>
+                    <span>R$ ${p.preco.toFixed(2)}</span>
+                </div>
+                <button class="btn-add" onclick="adicionar('${p.nome}', ${p.preco})">+</button>
+            </div>
+        `).join('');
+    }
+
+    // LÓGICA DO CARRINHO
+    function adicionar(nome, preco) {
+        carrinho.push({nome, preco});
+        total += preco;
+        atualizarInterface();
+    }
+
+    function atualizarInterface() {
+        const lista = document.getElementById('itens-carrinho');
+        if(carrinho.length > 0) {
+            lista.innerHTML = carrinho.map(i => `<div>• ${i.nome} - R$ ${i.preco.toFixed(2)}</div>`).join('');
+        }
+        document.getElementById('valor-total').innerText = total.toFixed(2);
+        document.getElementById('pontos-ganhos').innerText = Math.floor(total);
+    }
+
+    // LÓGICA DE PRIVACIDADE (LGPD)
+    function verificarLGPD() {
+        if(!localStorage.getItem('consentimento_lgpd')) {
+            document.getElementById('lgpd-banner').style.display = 'block';
+        }
+    }
+
+    function aceitarPrivacidade() {
+        localStorage.setItem('consentimento_lgpd', 'true');
+        document.getElementById('lgpd-banner').style.display = 'none';
+    }
+
+    // SIMULAÇÃO DE PAGAMENTO EXTERNO
+    function abrirPagamento() {
+        if(carrinho.length === 0) return alert("Adicione itens ao carrinho primeiro!");
+        
+        const modal = document.getElementById('tela-processamento');
+        modal.style.display = 'flex';
+
+        // Simula o tempo de resposta de uma API externa (ex: Gateway Stone/Stripe)
+        setTimeout(() => {
+            document.querySelector('.loader').style.display = 'none';
+            document.getElementById('msg-pagamento').innerText = "PAGAMENTO APROVADO!";
+            document.getElementById('msg-pagamento').style.color = "var(--sucesso)";
+            document.getElementById('sub-msg').innerText = "Seu pedido foi enviado para a cozinha.";
+            document.getElementById('btn-fechar-sucesso').style.display = 'block';
+        }, 3000);
+    }
+
+    function reiniciarSistema() {
+        location.reload(); // Reseta o estado para um novo cliente
+    }
+</script>
+
+</body>
+</html>
